@@ -9,5 +9,6 @@ futures = "0.3.31"
 serde = "1.0.219"
 serde_json = "1.0.140"
 sqlite = "0.37.0"
+teloxide = "0.15.0"
 thirtyfour = "0.35.0"
 tokio = { version = "1.44.2", features = ["macros", "rt", "rt-multi-thread"] }
