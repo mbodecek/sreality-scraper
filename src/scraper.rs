@@ -14,16 +14,19 @@ use serde_json::json;
 
 pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
     let stream = try_stream! {
+        // Initialize webdriver with headless chrome
         let mut caps = DesiredCapabilities::chrome();
         caps.insert_base_capability("goog:chromeOptions".to_string(), json!({"args": ["--headless"]}));
         let driver = WebDriver::new(env::var("SELENIUM_URL").expect("SELENIUM_URL is not set"), caps).await?;
 
-        let hostname = env::var("SREALITY_URL").expect("SREALITY_URL is not set");
 
+        // Go to the list of offers
+        let hostname = env::var("SREALITY_URL").expect("SREALITY_URL is not set");
         driver.goto(format!("{}{}", hostname, env::var("SREALITY_LIST").expect("SREALITY_LIST is not set"))).await?;
 
-        sleep(Duration::from_secs(2)).await;
+        sleep(Duration::from_secs(10)).await;
 
+        // Click the button to agree with the ads
         let shadow_root = driver
             .find(By::XPath(
                 "//div[contains(@class,\"szn-cmp-dialog-container\")]",
@@ -31,16 +34,16 @@ pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
             .await?
             .get_shadow_root()
             .await?;
-
         shadow_root
             .find(By::Css("button[data-testid=\"cw-button-agree-with-ads\"]"))
             .await?
             .click()
             .await?;
 
-        sleep(Duration::from_secs(4)).await;
+        sleep(Duration::from_secs(10)).await;
 
         loop {
+            // find all links to the detail page
             let mut paths = driver
                 .find_all(By::XPath("//a[starts-with(@href, '/detail/prodej/byt/')]"))
                 .await?
@@ -48,17 +51,19 @@ pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
                 .map(async |link| { let result: String = link.attr("href").await?.unwrap(); Ok::<String, WebDriverError>(result) })
                 .collect::<FuturesUnordered<_>>();
 
+            // yield all the detail page urls
             while let Some(pf) = paths.next().await {
                 let p = pf?;
                 yield format!("{}{}", hostname, p);
             }
 
+            // find and click the button to load more results
             let button = driver
                 .find_all(By::XPath("//button[@data-e2e=\"show-more-btn\"]"))
                 .await?;
             if button.len() > 0 {
                 button[0].click().await?;
-                sleep(Duration::from_secs(4)).await;
+                sleep(Duration::from_secs(10)).await;
             } else {
                 break;
             }
