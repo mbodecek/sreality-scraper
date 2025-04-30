@@ -1,3 +1,4 @@
+use std::env;
 use std::time::Duration;
 
 use thirtyfour::CapabilitiesHelper;
@@ -15,11 +16,11 @@ pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
     let stream = try_stream! {
         let mut caps = DesiredCapabilities::chrome();
         caps.insert_base_capability("goog:chromeOptions".to_string(), json!({"args": ["--headless"]}));
-        let driver = WebDriver::new("http://localhost:61989", caps).await?;
+        let driver = WebDriver::new(env::var("SELENIUM_URL").expect("SELENIUM_URL is not set"), caps).await?;
 
-        let hostname = "https://www.sreality.cz";
+        let hostname = env::var("SREALITY_URL").expect("SREALITY_URL is not set");
 
-        driver.goto(format!("{}{}", hostname, "/hledani/prodej/byty/brno?velikost=3%2Bkk%2C4%2Bkk&navic=terasa&vlastnictvi=osobni&cena-od=9256624&cena-do=14032559")).await?;
+        driver.goto(format!("{}{}", hostname, env::var("SREALITY_LIST").expect("SREALITY_LIST is not set"))).await?;
 
         sleep(Duration::from_secs(2)).await;
 

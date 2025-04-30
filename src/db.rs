@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{env, error::Error};
 
 use sqlite::Connection;
 
@@ -8,7 +8,7 @@ pub struct DB {
 
 impl DB {
     pub fn new() -> Result<Self, Box<dyn Error>> {
-        let connection = sqlite::open("./db.sqlite")?;
+        let connection = sqlite::open(env::var("DB_PATH").expect("DB_PATH is not set"))?;
 
         // Initialize the DB
         connection.execute("CREATE TABLE IF NOT EXISTS known_urls (url TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);")?;
@@ -22,6 +22,6 @@ impl DB {
         st.bind((":url", url))?;
         st.next()?;
 
-        Ok(self.connection.change_count() == 0)
+        Ok(self.connection.change_count() > 0)
     }
 }

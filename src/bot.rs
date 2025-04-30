@@ -3,12 +3,12 @@ use std::env;
 use std::error::Error;
 
 use futures::TryStreamExt;
+use tokio::sync::RwLock;
+
+use teloxide::Bot;
 use teloxide::prelude::Requester;
 use teloxide::types::{ChatId, UpdateKind};
 use teloxide::update_listeners::AsUpdateStream;
-
-use teloxide::Bot;
-use tokio::sync::RwLock;
 
 /// Handles listening to new subscriptions and notifying them
 pub struct Chats {
