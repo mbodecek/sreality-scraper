@@ -32,6 +32,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let mut urls = scraper::extract_urls().await;
         while let Some(url) = urls.try_next().await? {
             if db.add_url(&url)? {
+                println!("Notifying about {}", url);
                 chats.notify(&url).await?;
             }
         }

@@ -12,11 +12,17 @@ use tokio::time::sleep;
 
 use serde_json::json;
 
+const PAGE_LOAD_SECONDS: u64 = 10;
+
+pub async fn wait_for_page_load() {
+    sleep(Duration::from_secs(PAGE_LOAD_SECONDS)).await;
+}
+
 pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
     let stream = try_stream! {
         // Initialize webdriver with headless chrome
         let mut caps = DesiredCapabilities::chrome();
-        //caps.insert_base_capability("goog:chromeOptions".to_string(), json!({"args": ["--headless"]}));
+        caps.insert_base_capability("goog:chromeOptions".to_string(), json!({"args": ["--headless"]}));
         let driver = WebDriver::new(env::var("SELENIUM_URL").expect("SELENIUM_URL is not set"), caps).await?;
 
         // Go to the list of offers
@@ -33,9 +39,11 @@ pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
                 },
             };
 
+            println!("Going to {}", format!("{}{}", hostname, path));
+
             // Go to the list of offers
             driver.goto(format!("{}{}", hostname, path)).await?;
-            sleep(Duration::from_secs(10)).await;
+            wait_for_page_load().await;
 
             // Click the button to agree with the ads
             let shadow_root_el = driver
@@ -52,14 +60,18 @@ pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
                 .click()
                 .await?;
 
-                sleep(Duration::from_secs(10)).await;
+                wait_for_page_load().await;
             }
 
             loop {
+                let path_els = driver
+                    .find_all(By::XPath("//a[starts-with(@href, '/detail/')]"))
+                    .await?;
+
+                println!("Found {} offers", path_els.len());
+
                 // find all links to the detail page
-                let mut paths = driver
-                    .find_all(By::XPath("//a[starts-with(@href, '/detail/prodej/byt/')]"))
-                    .await?
+                let mut paths = path_els
                     .into_iter()
                     .map(async |link| { let result: String = link.attr("href").await?.unwrap(); Ok::<String, WebDriverError>(result) })
                     .collect::<FuturesUnordered<_>>();
@@ -75,8 +87,9 @@ pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
                     .find_all(By::XPath("//button[@data-e2e=\"show-more-btn\"]"))
                     .await?;
                 if button.len() > 0 {
+                    println!("Next page...");
                     button[0].click().await?;
-                    sleep(Duration::from_secs(10)).await;
+                    wait_for_page_load().await;
                 } else {
                     break;
                 }
