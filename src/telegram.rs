@@ -1,36 +1,34 @@
-use std::collections::HashSet;
 use std::env;
 use std::error::Error;
 
 use futures::TryStreamExt;
-use tokio::sync::RwLock;
 
 use teloxide::Bot;
 use teloxide::prelude::Requester;
 use teloxide::types::{ChatId, UpdateKind};
 use teloxide::update_listeners::AsUpdateStream;
 
+use crate::db::DB;
+
 /// Handles listening to new subscriptions and notifying them
-pub struct Chats {
-    chats: RwLock<HashSet<ChatId>>,
+pub struct Telegram {
     bot: Bot,
 }
 
-impl Chats {
-    pub fn new() -> Self {
-        Self {
-            chats: RwLock::new(HashSet::new()),
+impl Telegram {
+    pub fn new() -> Result<Self, Box<dyn Error>> {
+        Ok(Self {
             bot: Bot::new(env::var("TELEGRAM_BOT_TOKEN").expect("TELEGRAM_BOT_TOKEN not set")),
-        }
+        })
     }
 
-    pub async fn listen(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn listen(&self, db: &DB) -> Result<(), Box<dyn Error>> {
         let mut polling = teloxide::update_listeners::polling_default(self.bot.clone()).await;
 
         let mut update_stream = Box::pin(polling.as_stream());
         while let Some(update) = update_stream.try_next().await? {
             if let UpdateKind::Message(message) = update.kind {
-                self.chats.write().await.insert(message.chat.id);
+                db.add_chat_id(message.chat.id.0).await?;
                 self.bot
                     .send_message(
                         message.chat.id,
@@ -43,9 +41,10 @@ impl Chats {
         Ok(())
     }
 
-    pub async fn notify(&self, url: &str) -> Result<(), Box<dyn Error>> {
-        for chat_id in self.chats.read().await.iter() {
-            self.bot.send_message(chat_id.clone(), url).await?;
+    pub async fn notify(&self, db: &DB, url: &str) -> Result<(), Box<dyn Error>> {
+        let chat_ids = db.get_chat_ids().await?;
+        for chat_id in chat_ids.iter() {
+            self.bot.send_message(ChatId(*chat_id), url).await?;
         }
 
         Ok(())
