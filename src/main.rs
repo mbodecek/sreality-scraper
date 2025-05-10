@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let db = DB::new()?;
     loop {
         // Extract new urls from the web every hour
-        let mut urls = scraper::extract_urls().await;
+        let mut urls = Box::pin(scraper::extract_urls().await);
 
         loop {
             match urls.try_next().await {

@@ -19,7 +19,7 @@ pub async fn wait_for_page_load() {
 }
 
 pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
-    let stream = try_stream! {
+    try_stream! {
         // Initialize webdriver with headless chrome
         let mut caps = DesiredCapabilities::chrome();
         caps.insert_base_capability("goog:chromeOptions".to_string(), json!({"args": ["--headless=new", "--window-size=1920,1080"]}));
@@ -95,7 +95,5 @@ pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
                 }
             }
         }
-    };
-
-    Box::pin(stream)
+    }
 }
