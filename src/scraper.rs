@@ -39,7 +39,7 @@ pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
                 },
             };
 
-            println!("Going to {}", format!("{}{}", hostname, path));
+            println!("Visiting {}", format!("{}{}", hostname, path));
 
             // Go to the list of offers
             driver.goto(format!("{}{}", hostname, path)).await?;
@@ -87,7 +87,7 @@ pub async fn extract_urls() -> impl Stream<Item = WebDriverResult<String>> {
                     .find_all(By::XPath("//button[@data-e2e=\"show-more-btn\"]"))
                     .await?;
                 if button.len() > 0 {
-                    println!("Next page...");
+                    println!("Clicking next page...");
                     button[0].click().await?;
                     wait_for_page_load().await;
                 } else {

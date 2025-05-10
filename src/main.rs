@@ -51,6 +51,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
+        println!("Sleeping for 1 hour");
         sleep(Duration::from_secs(60 * 60)).await;
     }
 }
