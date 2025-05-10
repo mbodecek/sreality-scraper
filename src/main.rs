@@ -31,10 +31,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
     loop {
         // Extract new urls from the web every hour
         let mut urls = scraper::extract_urls().await;
-        while let Some(url) = urls.try_next().await? {
-            if db.add_url(&url).await? {
-                println!("Notifying about {}", url);
-                telegram.notify(&db, &url).await?;
+
+        loop {
+            match urls.try_next().await {
+                Ok(Some(url)) => {
+                    if db.add_url(&url).await? {
+                        println!("Notifying about {}", url);
+                        telegram.notify(&db, &url).await?;
+                    }
+                }
+                Ok(None) => {
+                    break;
+                }
+                Err(e) => {
+                    // print to stderr
+                    eprintln!("Error: {}", e);
+                    break;
+                }
             }
         }
 
