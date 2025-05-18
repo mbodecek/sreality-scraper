@@ -36,20 +36,22 @@ impl DB {
             let old_price: Option<i64> = select_st.read("price")?;
 
             match old_price {
-                Some(old_price) => {
-                    if old_price as u64 == price {
-                        return Ok(AddUrlOutcome::NoChange);
-                    } else {
-                        // Update the price
-                        let mut update_st =
-                            conn.prepare("UPDATE known_urls SET price = :price WHERE url = :url;")?;
-                        update_st.bind((":price", price as i64))?;
-                        update_st.bind((":url", url))?;
-                        update_st.next()?;
+                Some(old_price) if old_price as u64 == price => AddUrlOutcome::NoChange,
+                _ => {
+                    // Update the price
+                    let mut update_st =
+                        conn.prepare("UPDATE known_urls SET price = :price WHERE url = :url;")?;
+                    update_st.bind((":price", price as i64))?;
+                    update_st.bind((":url", url))?;
+                    update_st.next()?;
+
+                    // return PriceChanged outcome (or no change if the price was previously not known)
+                    if let Some(old_price) = old_price {
                         AddUrlOutcome::PriceChanged(old_price as u64)
+                    } else {
+                        AddUrlOutcome::NoChange
                     }
                 }
-                None => AddUrlOutcome::NoChange,
             }
         } else {
             // Insert new URL
@@ -149,6 +151,15 @@ mod tests {
 
         // Add same URL with different price
         let result = db.add_url("https://example.com/1", 2000).await.unwrap();
+
+        // Check the DB that price was updated
+        let conn = db.connection.lock().await;
+        let mut st = conn
+            .prepare("SELECT price FROM known_urls WHERE url = 'https://example.com/1';")
+            .unwrap();
+        st.next().unwrap();
+        let price: Option<i64> = st.read("price").unwrap();
+        assert_eq!(price, Some(2000));
 
         // Should treat as NoChange
         match result {
