@@ -3,13 +3,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::TryStreamExt;
+use num_format::{Locale, ToFormattedString};
 use tokio::time::sleep;
 
 mod db;
 mod scraper;
 mod telegram;
 
-use db::DB;
+use db::{AddUrlOutcome, DB};
 use telegram::Telegram;
 
 #[tokio::main]
@@ -24,22 +25,46 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    // Wait for 1 minute before starting to scrape
-    sleep(Duration::from_secs(60)).await;
-
     let db = DB::new()?;
     loop {
-        // Extract new urls from the web every hour
-        let mut urls = Box::pin(scraper::extract_urls().await);
+        // Extract new offers from the web every hour
+        let mut offers = Box::pin(scraper::extract_offers().await);
 
         loop {
-            match urls.try_next().await {
-                Ok(Some(url)) => {
-                    if db.add_url(&url).await? {
-                        println!("Notifying about {}", url);
-                        telegram.notify(&db, &url).await?;
+            match offers.try_next().await {
+                Ok(Some(offer)) => match db.add_url(&offer.url, offer.price).await? {
+                    AddUrlOutcome::Added => {
+                        println!("Notifying about {}", offer.url);
+                        telegram
+                            .notify(
+                                &db,
+                                &format!(
+                                    "Nový byt ({} Kč): {}",
+                                    offer.price.to_formatted_string(&Locale::cs),
+                                    offer.url
+                                ),
+                            )
+                            .await?;
                     }
-                }
+                    AddUrlOutcome::PriceChanged(old_price) => {
+                        println!(
+                            "Price changed from {} to {} for {}",
+                            old_price, offer.price, offer.url
+                        );
+                        telegram
+                            .notify(
+                                &db,
+                                &format!(
+                                    "Cena se změnila z {} Kč na {} Kč: {}",
+                                    old_price.to_formatted_string(&Locale::cs),
+                                    offer.price.to_formatted_string(&Locale::cs),
+                                    offer.url
+                                ),
+                            )
+                            .await?;
+                    }
+                    AddUrlOutcome::NoChange => {}
+                },
                 Ok(None) => {
                     break;
                 }

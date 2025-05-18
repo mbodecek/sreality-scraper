@@ -41,10 +41,10 @@ impl Telegram {
         Ok(())
     }
 
-    pub async fn notify(&self, db: &DB, url: &str) -> Result<(), Box<dyn Error>> {
+    pub async fn notify(&self, db: &DB, text: &str) -> Result<(), Box<dyn Error>> {
         let chat_ids = db.get_chat_ids().await?;
         for chat_id in chat_ids.iter() {
-            self.bot.send_message(ChatId(*chat_id), url).await?;
+            self.bot.send_message(ChatId(*chat_id), text).await?;
         }
 
         Ok(())
