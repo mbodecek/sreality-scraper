@@ -80,7 +80,7 @@ pub async fn extract_offers() -> impl Stream<Item = WebDriverResult<Offer>> {
                         fn price_xpath_filter(suffix: &str) -> String {
                             format!("substring(normalize-space(string(./text())), string-length(normalize-space(string(./text()))) + 1 - string-length(string('{}'))) = '{}'", suffix, suffix)
                         }
-                        let price_xpath = format!(".//*[{}]", [price_xpath_filter("Kč"), price_xpath_filter("Kč/měsíc")].join(" or "));
+                        let price_xpath = format!(".//*[{} or {}]", price_xpath_filter("Kč"), price_xpath_filter("Kč/měsíc"));
 
                         let price_str = link.find(By::XPath(price_xpath)).await?.text().await?;
                         let price = price_str.chars().filter(|c| c.is_digit(10)).collect::<String>().parse::<u64>().unwrap();
@@ -97,9 +97,9 @@ pub async fn extract_offers() -> impl Stream<Item = WebDriverResult<Offer>> {
                 let button = driver
                     .find_all(By::XPath("//button[@data-e2e=\"show-more-btn\"]"))
                     .await?;
-                if button.len() > 0 {
+                if let Some(button) = button.first() {
                     println!("Clicking next page...");
-                    button[0].click().await?;
+                    button.click().await?;
                     wait_for_page_load().await;
                 } else {
                     break;
